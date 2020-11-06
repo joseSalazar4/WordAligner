@@ -3,17 +3,20 @@
 import Data.List
 import System.IO
 import Data.Char (isSpace)
+import Control.Monad
+import  Data.Map
 
 type Line = [Token]
 data Token = Word String | Blank | HypWord String
              deriving (Eq,Show)
 
+type HypMap = Data.Map.Map String [String]
 
 string2line :: String -> Line
-string2line text = map (\palab -> Word palab) (words text)
+string2line text = Data.List.map (\palab -> Word palab) (words text)
 
 line2string :: Line -> String
-line2string linea = trim $foldl (++) "" (map convertTokenToString linea)
+line2string linea = trim $Data.List.foldl (++) "" (Data.List.map convertTokenToString linea)
                     
 convertTokenToString :: Token -> String
 convertTokenToString (Word linea) = linea++" "
@@ -35,9 +38,34 @@ tokenLength (HypWord token) = length token + 1    -- Tomar en cuenta el "-"
 tokenLength (Blank) = 1
 
 lineLength :: Line -> Int   
-lineLength linea = (length  $ words $ line2string linea) + sum (map tokenLength linea) - 1; 
+lineLength linea = (length  $ words $ line2string linea) + sum (Data.List.map tokenLength linea) - 1; 
 
 breakLine :: Int -> Line -> (Line,Line)
-breakLine m k = (k,k) 
-                where
-                
+breakLine _ [] = ([],[])
+breakLine cont (x:xs) = if tokenLength x <= cont
+                        then (x:m, j)  
+                        else
+                            ([], x:xs)
+                        where y = cont - tokenLength x
+                              (m,j) = breakLine y xs
+
+mergers :: [String] -> [(String,String)]
+mergers  k = [ (join $fst $Data.List.splitAt x k, join $snd $Data.List.splitAt x k) | x <- [1.. (length k) -1] ] 
+
+
+-- busca la palabra sin puntos en palabraArreglada luego signos le da la vuelta y agarra los signos y luego con
+-- list comprehension saco de cada tupla los elementos y a la derecha le concateno los signos (variable)
+hyphenate :: HypMap -> Token -> [(Token,Token)]
+hyphenate mapa token =  [ (HypWord $ fst y, Word $ snd y ++ signos) | y <- ys ]
+                        where ys = mergers (rmvMaybeStr (Data.Map.lookup palabraArreglada mapa)) 
+                              palabraArreglada = takeWhile (\ x -> x/='.'  ) $ convertTokenToString token
+                              signos =  takeWhile (\ x -> x == '.' ) $ reverse $ Data.List.take (tokenLength token) $convertTokenToString token
+
+
+rmvMaybeStr :: Maybe [String] -> [String]
+rmvMaybeStr (Just linea) = linea
+rmvMaybeStr Nothing = []
+--enHyp = Data.Map.fromList [("controla",["con","tro","la"]),("futuro",["fu","tu","ro"]),("presente",["pre","sen","te"])]
+
+lineBreaks :: HypMap -> Int -> Line -> [(Line,Line)]
+lineBreaks map cont linea = []  
