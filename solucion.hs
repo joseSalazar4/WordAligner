@@ -1,7 +1,6 @@
 --Hecho por Jose Salazar--
 --Fecha Inicio: 29/10/2020--
 import Data.List
-import System.IO
 import Data.Char (isSpace)
 import Control.Monad
 import  Data.Map
@@ -11,6 +10,8 @@ data Token = Word String | Blank | HypWord String
              deriving (Eq,Show)
 
 type HypMap = Data.Map.Map String [String]
+
+enHyp = Data.Map.fromList [("controla",["con","tro","la"]),("futuro",["fu","tu","ro"]),("presente",["pre","sen","te"])]
 
 string2line :: String -> Line
 string2line text = Data.List.map (\palab -> Word palab) (words text)
@@ -46,7 +47,7 @@ breakLine cont (x:xs) = if tokenLength x <= cont
                         then (x:m, j)  
                         else
                             ([], x:xs)
-                        where y = cont - tokenLength x
+                        where y = cont - tokenLength x - 1
                               (m,j) = breakLine y xs
 
 mergers :: [String] -> [(String,String)]
@@ -58,8 +59,8 @@ mergers  k = [ (join $fst $Data.List.splitAt x k, join $snd $Data.List.splitAt x
 hyphenate :: HypMap -> Token -> [(Token,Token)]
 hyphenate mapa token =  [ (HypWord $ fst y, Word $ snd y ++ signos) | y <- ys ]
                         where ys = mergers (rmvMaybeStr (Data.Map.lookup palabraArreglada mapa)) 
-                              palabraArreglada = takeWhile (\ x -> x/='.'  ) $ convertTokenToString token
-                              signos =  takeWhile (\ x -> x == '.' ) $ reverse $ Data.List.take (tokenLength token) $convertTokenToString token
+                              palabraArreglada = takeWhile (\ x -> x `notElem` ['.','!','?'] ) $ init $ convertTokenToString token
+                              signos =  takeWhile (\ x -> x `elem` ['.','!','?']) $ reverse $ init $convertTokenToString token
 
 
 rmvMaybeStr :: Maybe [String] -> [String]
@@ -68,4 +69,9 @@ rmvMaybeStr Nothing = []
 --enHyp = Data.Map.fromList [("controla",["con","tro","la"]),("futuro",["fu","tu","ro"]),("presente",["pre","sen","te"])]
 
 lineBreaks :: HypMap -> Int -> Line -> [(Line,Line)]
-lineBreaks map cont linea = []  
+lineBreaks mapa cont linea = do
+                            let (linea1, linea2) =  breakLine cont linea
+                            (linea1,linea2): Data.List.map (\ (hyp,word)->  ((linea1++[hyp]), word:tail linea2))  (hyphenate mapa (Data.List.head linea2))
+
+removeOverCount :: [(Line),(Line)] -> Int
+removeOverCount lista = 
