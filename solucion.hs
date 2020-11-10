@@ -5,8 +5,7 @@ module Solucion where
 import Data.List ( map, foldl, head, splitAt, tail, dropWhileEnd )
 import Data.Char (isSpace)
 import Control.Monad
-import  Data.Map
-import Data.Data (typeOf)
+import Data.Map ( fromList, lookup, Map ) 
 
 type Line = [Token]
 data Token = Word String | Blank | HypWord String
@@ -15,9 +14,8 @@ data Token = Word String | Blank | HypWord String
 data Argumento = NOAJUSTAR | AJUSTAR | NOSEPARAR | SEPARAR 
                 deriving (Eq,Show)
 
-type HypMap = Data.Map.Map String [String]
+type HypMap = Map String [String]
 
-enHyp = Data.Map.fromList [("controla",["con","tro","la"]),("futuro",["fu","tu","ro"]),("presente",["pre","sen","te"])]
 
 string2line :: String -> Line
 string2line text = Data.List.map (\palab -> Word palab) (words text)
@@ -64,7 +62,7 @@ mergers  k = [ (join $fst $Data.List.splitAt x k, join $snd $Data.List.splitAt x
 -- list comprehension saco de cada tupla los elementos y a la derecha le concateno los signos (variable)
 hyphenate :: HypMap -> Token -> [(Token,Token)]
 hyphenate mapa token =  [ (HypWord $ fst y, Word $ snd y ++ signos) | y <- ys ]
-                        where ys = mergers (rmvMaybeStr (Data.Map.lookup palabraArreglada mapa)) 
+                        where ys = mergers (rmvMaybeStr (Data.Map.lookup  palabraArreglada mapa)) 
 
                               palabraArreglada = takeWhile (\ x -> x `notElem` ['.','!','?'] ) $ init $ convertTokenToString token
 
@@ -109,47 +107,47 @@ addSomeBlanks cont (x:xs) = if x/=Blank
                             else [x] ++ addSomeBlanks cont xs 
 
 
-separarYalinear :: Int -> Argumento -> Argumento -> String -> [String]
-separarYalinear cont SEPARAR AJUSTAR  frase = ajustarSeparar cont frase 
-separarYalinear cont NOSEPARAR AJUSTAR  frase = ajustarNoSeparar cont frase
-separarYalinear cont SEPARAR NOAJUSTAR  frase = noAjustarSeparar cont frase
-separarYalinear cont NOSEPARAR NOAJUSTAR frase = noAjustarNoSeparar cont frase
+separarYalinear :: Int -> Argumento -> Argumento -> HypMap -> String -> [String] 
+separarYalinear cont SEPARAR AJUSTAR  hyp frase = ajustarSeparar hyp cont frase 
+separarYalinear cont NOSEPARAR AJUSTAR  hyp frase = ajustarNoSeparar hyp cont frase
+separarYalinear cont SEPARAR NOAJUSTAR  hyp frase = noAjustarSeparar hyp cont frase
+separarYalinear cont NOSEPARAR NOAJUSTAR hyp frase = noAjustarNoSeparar hyp cont frase
 
 
-ajustarSeparar :: Int -> String -> [String]
-ajustarSeparar cont lineaLeida = Data.List.map (\x -> (line2string x) ) $ ajustarSepararAux enHyp cont (string2line lineaLeida)
+ajustarSeparar :: HypMap -> Int -> String -> [String]
+ajustarSeparar mapaPalab cont lineaLeida = Data.List.map (\x -> (line2string x) ) $ ajustarSepararAux mapaPalab cont (string2line lineaLeida)
 
 ajustarSepararAux ::HypMap -> Int -> Line -> [Line] 
 ajustarSepararAux _ _ [] = []
-ajustarSepararAux enHyp cont linea = do 
-                                    let espacio = cont - (lineLength $fst ( last (lineBreaks  enHyp cont linea)))
-                                    if snd ( last (lineBreaks  enHyp cont linea)) /= []
-                                    then [ insertBlanks espacio $fst ( last (lineBreaks  enHyp cont linea))] ++ ajustarSepararAux enHyp cont (snd (last (lineBreaks  enHyp cont linea)))
-                                    else [fst ( last (lineBreaks  enHyp cont linea))] ++ ajustarSepararAux enHyp cont (snd (last (lineBreaks  enHyp cont linea)))
+ajustarSepararAux mapaPalab cont linea = do 
+                                    let espacio = cont - (lineLength $fst ( last (lineBreaks  mapaPalab cont linea)))
+                                    if snd ( last (lineBreaks  mapaPalab cont linea)) /= []
+                                    then [ insertBlanks espacio $fst ( last (lineBreaks  mapaPalab cont linea))] ++ ajustarSepararAux mapaPalab cont (snd (last (lineBreaks  mapaPalab cont linea)))
+                                    else [fst ( last (lineBreaks  mapaPalab cont linea))] ++ ajustarSepararAux mapaPalab cont (snd (last (lineBreaks  mapaPalab cont linea)))
 
-noAjustarSeparar :: Int -> String -> [String] 
-noAjustarSeparar cont lineaLeida = Data.List.map (\x -> (line2string x) ) $ noAjustarSepararAux enHyp cont (string2line lineaLeida)
+noAjustarSeparar ::HypMap ->  Int -> String -> [String] 
+noAjustarSeparar mapaPalab cont lineaLeida = Data.List.map (\x -> (line2string x) ) $ noAjustarSepararAux mapaPalab cont (string2line lineaLeida)
 
 noAjustarSepararAux :: HypMap -> Int -> Line -> [Line] 
 noAjustarSepararAux _ _ [] = []
-noAjustarSepararAux enHyp cont linea = [fst ( last (lineBreaks  enHyp cont linea))] ++ noAjustarSepararAux enHyp cont (snd (last (lineBreaks  enHyp cont linea))) 
+noAjustarSepararAux mapaPalab cont linea = [fst ( last (lineBreaks  mapaPalab cont linea))] ++ noAjustarSepararAux mapaPalab cont (snd (last (lineBreaks  mapaPalab cont linea))) 
 
 
 --Penultimo CASO
-ajustarNoSeparar :: Int -> String -> [String]
-ajustarNoSeparar cont lineaLeida = Data.List.map (\x -> (line2string x) ) $ separarLineBreaksBlank enHyp cont (string2line lineaLeida)
+ajustarNoSeparar :: HypMap -> Int -> String -> [String]
+ajustarNoSeparar mapaPalab cont lineaLeida = Data.List.map (\x -> (line2string x) ) $ separarLineBreaksBlank mapaPalab cont (string2line lineaLeida)
 
 separarLineBreaksBlank :: HypMap -> Int -> Line -> [Line]
 separarLineBreaksBlank _ _ [] = []
-separarLineBreaksBlank enHyp cont linea = do 
-                                        let espacio = cont - (lineLength $fst ( head (lineBreaks  enHyp cont linea)))
-                                        if snd ( head (lineBreaks  enHyp cont linea)) /= []
-                                        then [ insertBlanks espacio $fst ( head (lineBreaks  enHyp cont linea))] ++ separarLineBreaksBlank enHyp cont (snd (head (lineBreaks  enHyp cont linea)))
-                                        else [fst ( head (lineBreaks  enHyp cont linea))] ++ separarLineBreaksBlank enHyp cont (snd (head (lineBreaks  enHyp cont linea)))
+separarLineBreaksBlank mapaPalab cont linea = do 
+                                        let espacio = cont - (lineLength $fst ( head (lineBreaks  mapaPalab cont linea)))
+                                        if snd ( head (lineBreaks  mapaPalab cont linea)) /= []
+                                        then [ insertBlanks espacio $fst ( head (lineBreaks  mapaPalab cont linea))] ++ separarLineBreaksBlank mapaPalab cont (snd (head (lineBreaks  mapaPalab cont linea)))
+                                        else [fst ( head (lineBreaks  mapaPalab cont linea))] ++ separarLineBreaksBlank mapaPalab cont (snd (head (lineBreaks  mapaPalab cont linea)))
 --ULTIMO CASO
-noAjustarNoSeparar :: Int -> String -> [String]
-noAjustarNoSeparar cont lineaLeida = Data.List.map (\x -> (line2string x) ) $ separarLineBreaks enHyp cont (string2line lineaLeida)
+noAjustarNoSeparar :: HypMap -> Int -> String -> [String]
+noAjustarNoSeparar mapaPalab  cont lineaLeida = Data.List.map (\x -> (line2string x) ) $ separarLineBreaks mapaPalab cont (string2line lineaLeida)
 
 separarLineBreaks :: HypMap -> Int -> Line -> [Line]
 separarLineBreaks _ _ [] = []
-separarLineBreaks enHyp cont linea = [fst ( head (lineBreaks  enHyp cont linea))] ++ separarLineBreaks enHyp cont (snd (head (lineBreaks  enHyp cont linea)))
+separarLineBreaks mapaPalab cont linea = [fst ( head (lineBreaks  mapaPalab cont linea))] ++ separarLineBreaks mapaPalab cont (snd (head (lineBreaks  mapaPalab cont linea)))
